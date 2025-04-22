@@ -4,6 +4,7 @@ import { feedbackSchema } from "@/constants";
 import { auth, db } from "@/firebase/admin";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
+import { cookies } from "next/headers";
 
 export async function getInterviewsByUserId(userId:string):Promise<Interview[] | null> {
     const interviews = await db.collection('interviews').where('userId', '==', userId ).orderBy('createdAt','desc').get()
@@ -107,3 +108,27 @@ export async function getFeedbackByInterviewId(params:GetFeedbackByInterviewIdPa
   const feedbackDoc = querySnapshot.docs[0];
   return { id: feedbackDoc.id, ...feedbackDoc.data() } as Feedback;
 }
+
+export async function logout() {
+    const cookieStore = cookies();
+    const sessionCookie = (await cookieStore).get('session')?.value;
+  
+    if (sessionCookie) {
+      try {
+        const decodedClaims = await auth.verifySessionCookie(sessionCookie);
+  
+        // Revoga os tokens de atualização do usuário
+        await auth.revokeRefreshTokens(decodedClaims.sub);
+      } catch (error) {
+        console.error('Erro ao revogar token:', error);
+      }
+  
+      // Limpa o cookie de qualquer forma
+      (await cookieStore).set('session', '', {
+        maxAge: 0,
+        path: '/',
+      });
+    }
+  
+    return { success: true };
+  }
